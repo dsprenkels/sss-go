@@ -12,6 +12,16 @@ import (
 )
 
 
+// Splits secret `data` into `n` shares, requiring `k` shares for restoring
+// the original secret.
+// `data` must be a buffer of exactly 64 bytes.
+// `n` and `k` must be numbers from 1 to 255 (inclusive).
+// `k` may not be larger than `n`, as this would make it impossible to
+// restore the secret.
+//
+// This function returns a tuple `(shares, err)`. The caller must check if
+// `err` is not `nil`, as this indicates an error. If `err` is not `nil`,
+// `shares` will be a slice of share bufs which are each exactly 113 bytes long.
 func CreateShares(data []byte, n int, k int) ([][]byte, error) {
     if len(data) != C.sss_MLEN {
         msg := fmt.Sprintf("`data` must be %d bytes long", C.sss_MLEN)
@@ -59,6 +69,13 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 }
 
 
+// Tries to combine the shares in `serialized_shares`. Each of the shares
+// passed to `CombineShares`, must be exactly 113 bytes long.
+// This funtion returns a tuple `(data, err)`. The caller must check if `err`
+// is not `nil`, as this indicates an error. If `err` is `nil`, `data` may be
+// a slice containing the original data. If it was impossible to restore a
+// sensible secret from the provided shares, `data` will be `nil`. (In this
+// case, the function returns `(nil, nil)`).
 func CombineShares(serialized_shares [][]byte) ([]byte, error) {
     k := len(serialized_shares)
     if k < 1 {

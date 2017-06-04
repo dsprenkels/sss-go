@@ -24,6 +24,11 @@ func TestCreateShares(t *testing.T) {
     if len(shares) != 5 {
         t.Fail()
     }
+    for _, share := range shares {
+        if len(share) != 113 {
+            t.Fail()
+        }
+    }
 }
 
 
