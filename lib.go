@@ -1,0 +1,106 @@
+package sss
+
+// #include "sss.h"
+// #include "serialize.h"
+import "C"
+
+import (
+    "fmt"
+    "errors"
+    "encoding/binary"
+    "crypto/rand"
+    "unsafe"
+)
+
+
+func CreateShares(data []byte, n int, k int) ([][]byte, error) {
+    if len(data) != C.sss_MLEN {
+        msg := fmt.Sprintf("`data` must be %d bytes long", C.sss_MLEN)
+        return nil, errors.New(msg)
+    }
+    if n < 1 || n > 255 {
+        msg := fmt.Sprintf("`n` must be in `[1..255]` (is %d)", n)
+        return nil, errors.New(msg)
+    }
+    if k < 1 || k > n {
+        msg := fmt.Sprintf("`k` must be in `[1..n]` (is %d and n = %d)", k, n)
+        return nil, errors.New(msg)
+    }
+
+    // Convert n and k to bytes
+    var cty_n, cty_k C.uint8_t = C.uint8_t(n), C.uint8_t(k)
+
+    // Create a temporary buffer to hold the shares
+    shares := make([]byte, n * C.sizeof_sss_Share)
+
+    // Generate a random key
+    var random_bytes [32]byte;
+    binary.Read(rand.Reader, binary.LittleEndian, &random_bytes)
+
+    // Create the shares
+    C.sss_create_shares(
+        (*C.sss_Share)(unsafe.Pointer(&shares[0])),
+        (*C.uint8_t)(unsafe.Pointer(&data[0])),
+        cty_n, cty_k,
+        (*C.uint8_t)(unsafe.Pointer(&random_bytes[0])))
+
+    // Serialize the shares into a Go-friendly slice of slices
+    serialized_shares := make([][]byte, n)
+    for i := 0; i < n; i += 1 {
+        serialized_shares[i] = make([]byte, C.sss_SHARE_SERIALIZED_LEN)
+        C.sss_serialize_share(
+            (*C.uint8_t)(unsafe.Pointer(&serialized_shares[i][0])),
+            (*C.sss_Share)(unsafe.Pointer(&shares[i*C.sizeof_sss_Share])))
+    }
+
+    return serialized_shares, nil
+}
+
+
+func CombineShares(serialized_shares [][]byte) ([]byte, error) {
+    k := len(serialized_shares)
+    if k < 1 {
+        return nil, errors.New("input slice was empty")
+    }
+    if k > 254 {
+        msg := fmt.Sprintf("too many input slices supplied (%d)", k)
+        return nil, errors.New(msg)
+    }
+
+    // Create a temporary buffer to hold the shares
+    shares := make([]byte, k * C.sizeof_sss_Share)
+
+    for i, share := range serialized_shares {
+        if len(share) != C.sss_SHARE_SERIALIZED_LEN {
+            msg := fmt.Sprintf("share %d has an invalid length", i)
+            return nil, errors.New(msg)
+        }
+        // Decode the share
+        C.sss_unserialize_share(
+            (*C.sss_Share)(unsafe.Pointer(&shares[i*C.sizeof_sss_Share])),
+            (*C.uint8_t)(unsafe.Pointer(&serialized_shares[i][0])))
+
+    }
+
+    // Create a new slice to store the restored data in
+    data := make([]byte, C.sss_MLEN)
+
+    // Convert k to uint8_t
+    cty_k := C.uint8_t(k)
+
+    // Combine the shares to restore the secret
+    ret, err := C.sss_combine_shares(
+        (*C.uint8_t)(unsafe.Pointer(&data[0])),
+        (*C.sss_Share)(unsafe.Pointer(&shares[0])),
+        cty_k)
+    if err != nil {
+        return nil, err
+    }
+
+    // If recombination failed, return `nil` w/o error
+    if ret != 0 {
+        return nil, nil
+    } else {
+        return data, nil
+    }
+}
