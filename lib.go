@@ -5,10 +5,9 @@ package sss
 import "C"
 
 import (
-    "fmt"
-    "errors"
-    "encoding/binary"
     "crypto/rand"
+    "errors"
+    "fmt"
     "unsafe"
 )
 
@@ -35,7 +34,10 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 
     // Generate a random key
     var random_bytes [32]byte;
-    binary.Read(rand.Reader, binary.LittleEndian, &random_bytes)
+    _, rand_err := rand.Read(random_bytes[:])
+    if rand_err != nil {
+        return nil, rand_err
+    }
 
     // Create the shares
     C.sss_create_shares(
