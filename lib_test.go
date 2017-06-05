@@ -37,7 +37,7 @@ func TestCreateShares(t *testing.T) {
 func TestCombineShares(t *testing.T) {
     f := func(n, k, k2 int, dataArr [64]byte) bool {
         n, k, k2 = n & 0xff, k & 0xff, k2 & 0xff
-        data := dataArr[0:64]
+        data := dataArr[:]
 
         // We can't really test anything if not n is not larger than k and k2
         if k > n || k2 > n {
