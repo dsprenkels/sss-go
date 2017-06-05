@@ -1,4 +1,4 @@
-# Go bindings for `sss`
+# Shamir secret sharing with Go
 
 `sss-go` contains Go bindings for my [Shamir secret sharing library][sss].
 This library allows users to split secret data into a number of different
