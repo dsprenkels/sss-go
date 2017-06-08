@@ -1,5 +1,7 @@
 # Shamir secret sharing with Go
 
+[![Build Status](https://travis-ci.org/dsprenkels/sss-go.svg?branch=master)](https://travis-ci.org/dsprenkels/sss-go)
+
 `sss-go` contains Go bindings for my [Shamir secret sharing library][sss].
 This library allows users to split secret data into a number of different
 shares. With the posession of some or all of these shares, the original secret
