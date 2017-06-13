@@ -1,6 +1,20 @@
 package sss
 
 // #include "sss.h"
+//
+// /* There seems to be a anomaly in the CGo setup which causes weird typing
+//  * issues with C types that are annotated as `const`. Passing `const` values
+//  * to C function directly from Go code seems to be something that the CGo
+//  * compiler cannot really handle. So we therefore need a small wrapper for
+//  * `sss_combine_shares` in C space which takes the non-const value of
+//  * `shares` and casts it to `(const sss_Share*)`.
+//  * See also: https://stackoverflow.com/a/32940436
+//  */
+// int
+// sss_combine_shares_go_wrapper(uint8_t *data, sss_Share *shares, uint8_t k)
+// {
+//     sss_combine_shares(data, (const sss_Share*) shares, k);
+// }
 import "C"
 
 import (
@@ -64,14 +78,6 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 // sensible secret from the provided shares, `data` will be `nil`. (In this
 // case, the function returns `(nil, nil)`).
 func CombineShares(go_shares [][]byte) ([]byte, error) {
-    // There seems to be a anomaly in the CGo setup which causes weird typing
-    // issues with C. `C.sss_create_shares` takes a `*C.sss_Share` type as an
-    // argument to the shares in, while `C.sss_combine_shares` does not allow
-    // this and *needs* a `*[sss_SHARE_LEN]C.uint8_t` type. These two types are
-    // essentially the same, so it does not matter. However, the behaviour of
-    // the CGo compiler is not very straightforward here, so I am worried that
-    // this may break some time in the future.
-
     k := len(go_shares)
     if k < 1 {
         return nil, errors.New("input slice was empty")
@@ -100,9 +106,9 @@ func CombineShares(go_shares [][]byte) ([]byte, error) {
     cty_k := C.uint8_t(k)
 
     // Combine the shares to restore the secret
-    ret, err := C.sss_combine_shares(
+    ret, err := C.sss_combine_shares_go_wrapper(
         (*C.uint8_t)(unsafe.Pointer(&data[0])),
-        (*[C.sss_SHARE_LEN]C.uint8_t)(unsafe.Pointer(&shares[0])),
+        (*C.sss_Share)(unsafe.Pointer(&shares[0])),
         cty_k)
     if err != nil {
         return nil, err
