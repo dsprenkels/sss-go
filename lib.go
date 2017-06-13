@@ -1,11 +1,9 @@
 package sss
 
 // #include "sss.h"
-// #include "serialize.h"
 import "C"
 
 import (
-    "crypto/rand"
     "errors"
     "fmt"
     "unsafe"
@@ -42,30 +40,19 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
     // Create a temporary buffer to hold the shares
     shares := make([]byte, n * C.sizeof_sss_Share)
 
-    // Generate a random key
-    var random_bytes [32]byte;
-    _, rand_err := rand.Read(random_bytes[:])
-    if rand_err != nil {
-        return nil, rand_err
-    }
-
     // Create the shares
     C.sss_create_shares(
         (*C.sss_Share)(unsafe.Pointer(&shares[0])),
         (*C.uint8_t)(unsafe.Pointer(&data[0])),
-        cty_n, cty_k,
-        (*C.uint8_t)(unsafe.Pointer(&random_bytes[0])))
+        cty_n, cty_k)
 
-    // Serialize the shares into a Go-friendly slice of slices
-    serialized_shares := make([][]byte, n)
+    // Move the shares into a Go-friendly slice of slices
+    go_shares := make([][]byte, n)
     for i := 0; i < n; i += 1 {
-        serialized_shares[i] = make([]byte, C.sss_SHARE_SERIALIZED_LEN)
-        C.sss_serialize_share(
-            (*C.uint8_t)(unsafe.Pointer(&serialized_shares[i][0])),
-            (*C.sss_Share)(unsafe.Pointer(&shares[i*C.sizeof_sss_Share])))
+        go_shares[i] = shares[i*C.sizeof_sss_Share : (i+1)*C.sizeof_sss_Share];
     }
 
-    return serialized_shares, nil
+    return go_shares, nil
 }
 
 
@@ -76,8 +63,16 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 // a slice containing the original data. If it was impossible to restore a
 // sensible secret from the provided shares, `data` will be `nil`. (In this
 // case, the function returns `(nil, nil)`).
-func CombineShares(serialized_shares [][]byte) ([]byte, error) {
-    k := len(serialized_shares)
+func CombineShares(go_shares [][]byte) ([]byte, error) {
+    // There seems to be a anomaly in the CGo setup which causes weird typing
+    // issues with C. `C.sss_create_shares` takes a `*C.sss_Share` type as an
+    // argument to the shares in, while `C.sss_combine_shares` does not allow
+    // this and *needs* a `*[sss_SHARE_LEN]C.uint8_t` type. These two types are
+    // essentially the same, so it does not matter. However, the behaviour of
+    // the CGo compiler is not very straightforward here, so I am worried that
+    // this may break some time in the future.
+
+    k := len(go_shares)
     if k < 1 {
         return nil, errors.New("input slice was empty")
     }
@@ -87,18 +82,15 @@ func CombineShares(serialized_shares [][]byte) ([]byte, error) {
     }
 
     // Create a temporary buffer to hold the shares
-    shares := make([]byte, k * C.sizeof_sss_Share)
+    shares := make([]byte, k * C.sss_SHARE_LEN)
 
-    for i, share := range serialized_shares {
-        if len(share) != C.sss_SHARE_SERIALIZED_LEN {
+    for i, share := range go_shares {
+        if len(share) != C.sss_SHARE_LEN {
             msg := fmt.Sprintf("share %d has an invalid length", i)
             return nil, errors.New(msg)
         }
-        // Decode the share
-        C.sss_unserialize_share(
-            (*C.sss_Share)(unsafe.Pointer(&shares[i*C.sizeof_sss_Share])),
-            (*C.uint8_t)(unsafe.Pointer(&serialized_shares[i][0])))
-
+        // Memcpy the share into our shares buffer
+        copy(shares[i*C.sss_SHARE_LEN : (i+1)*C.sss_SHARE_LEN], go_shares[i][:])
     }
 
     // Create a new slice to store the restored data in
@@ -110,7 +102,7 @@ func CombineShares(serialized_shares [][]byte) ([]byte, error) {
     // Combine the shares to restore the secret
     ret, err := C.sss_combine_shares(
         (*C.uint8_t)(unsafe.Pointer(&data[0])),
-        (*C.sss_Share)(unsafe.Pointer(&shares[0])),
+        (*[C.sss_SHARE_LEN]C.uint8_t)(unsafe.Pointer(&shares[0])),
         cty_k)
     if err != nil {
         return nil, err
