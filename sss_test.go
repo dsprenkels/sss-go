@@ -8,7 +8,7 @@ import (
 )
 
 
-func MakeData(c byte) []byte {
+func makeData(c byte) []byte {
     data := make([]byte, 64)
     for i, _ := range data {
         data[i] = c
@@ -18,7 +18,7 @@ func MakeData(c byte) []byte {
 
 
 func TestCreateShares(t *testing.T) {
-    data := MakeData(42)
+    data := makeData(42)
     shares, err := CreateShares(data, 5, 3)
     if err != nil {
         t.Fail()
@@ -75,7 +75,7 @@ func TestCombineShares(t *testing.T) {
 
 
 func BenchmarkCreateShares(b *testing.B) {
-    data := MakeData(42)
+    data := makeData(42)
     for i := 0; i < b.N; i++ {
         CreateShares(data, 5, 3)
     }
@@ -83,7 +83,7 @@ func BenchmarkCreateShares(b *testing.B) {
 
 
 func BenchmarkCombineShares(b *testing.B) {
-    data := MakeData(42)
+    data := makeData(42)
     shares, err := CreateShares(data, 5, 3)
     if err != nil {
         b.Error()

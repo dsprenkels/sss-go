@@ -13,7 +13,7 @@ package sss
 // int
 // sss_combine_shares_go_wrapper(uint8_t *data, sss_Share *shares, uint8_t k)
 // {
-//     sss_combine_shares(data, (const sss_Share*) shares, k);
+//     sss_combine_shares(data, shares, k);
 // }
 import "C"
 
@@ -32,20 +32,16 @@ import (
 // restore the secret.
 //
 // This function returns a tuple `(shares, err)`. The caller must check if
-// `err` is not `nil`, as this indicates an error. If `err` is not `nil`,
-// `shares` will be a slice of share bufs which are each exactly 113 bytes long.
+// `err` is not `nil`, as this indicates an error. If (and only if) `err` is
+// `nil`, `shares` will be a slice of share bufs which are each exactly 113
+// bytes long.
 func CreateShares(data []byte, n int, k int) ([][]byte, error) {
     if len(data) != C.sss_MLEN {
         msg := fmt.Sprintf("`data` must be %d bytes long", C.sss_MLEN)
         return nil, errors.New(msg)
     }
-    if n < 1 || n > 255 {
-        msg := fmt.Sprintf("`n` must be in `[1..255]` (is %d)", n)
-        return nil, errors.New(msg)
-    }
-    if k < 1 || k > n {
-        msg := fmt.Sprintf("`k` must be in `[1..n]` (is %d and n = %d)", k, n)
-        return nil, errors.New(msg)
+    if err := checkNK(n, k); err != nil {
+        return nil, err
     }
 
     // Convert n and k to bytes
@@ -79,12 +75,8 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 // case, the function returns `(nil, nil)`).
 func CombineShares(go_shares [][]byte) ([]byte, error) {
     k := len(go_shares)
-    if k < 1 {
-        return nil, errors.New("input slice was empty")
-    }
-    if k > 254 {
-        msg := fmt.Sprintf("too many input slices supplied (%d)", k)
-        return nil, errors.New(msg)
+    if err := checkCombineK(k); err != nil {
+        return nil, err
     }
 
     // Create a temporary buffer to hold the shares
