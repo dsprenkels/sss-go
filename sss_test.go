@@ -40,13 +40,13 @@ func TestCombineShares(t *testing.T) {
         data := dataArr[:]
 
         // We can't really test anything if not n is not larger than k and k2
-        if k > n || k2 > n {
+        if k > n || k2 > n || k < 1 {
             return true
         }
 
         shares, err := CreateShares(data, n, k)
         if err != nil {
-            return true
+            t.Error(err)
         }
 
         // Throw some of the shares away
@@ -58,7 +58,10 @@ func TestCombineShares(t *testing.T) {
         // Combine the filtered shares
         restored, err := CombineShares(new_shares)
         if err != nil {
-            return true
+            if k2 == 0 {
+                return true
+            }
+            t.Error(err)
         }
 
         if k2 < k {
@@ -68,7 +71,7 @@ func TestCombineShares(t *testing.T) {
         }
     }
 
-    if err := quick.Check(f, nil); err != nil {
+    if err := quick.Check(f, &quick.Config{MaxCountScale: 10}); err != nil {
         t.Error(err)
     }
 }

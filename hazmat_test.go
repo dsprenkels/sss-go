@@ -41,7 +41,7 @@ func TestCombineKeyshares(t *testing.T) {
         key := keyArr[:]
 
         // Unable to test if not n is not larger than k and k2
-        if k > n || k2 > n {
+        if k > n || k2 > n || k < 1 {
             return true
         }
 
@@ -59,13 +59,16 @@ func TestCombineKeyshares(t *testing.T) {
         // Combine the filtered keyshares
         restored, err := CombineKeyshares(new_keyshares)
         if err != nil {
+            if k2 == 0 {
+                return true
+            }
             t.Error(err)
         }
 
         return (k <= k2) == bytes.Equal(key, restored)
     }
 
-    if err := quick.Check(f, nil); err != nil {
+    if err := quick.Check(f, &quick.Config{MaxCountScale: 10}); err != nil {
         t.Error(err)
     }
 }
