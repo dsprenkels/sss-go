@@ -20,7 +20,7 @@ func makeKey(c byte) []byte {
 
 func TestCreateKeyshares(t *testing.T) {
     key := makeKey(42)
-    keyshares, err := CreateKeyshares(key, 5, 3)
+    keyshares, err := CreateKeyshares(key, 5, 4)
     if err != nil {
         t.Error(err)
     }

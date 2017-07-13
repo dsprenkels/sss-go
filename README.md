@@ -11,9 +11,9 @@ An example use case is a beer brewery which has a vault which conains their
 precious super secret recipe. The 5 board members of this brewery do not trust
 all the others well enough that they won't secretly break into the vault and
 sell the recipe to a competitor. So they split the code into 5 shares, and
-allow 3 shares to restore the original code. Now they are sure that the
-majority of the staff will know when the vault is opened, but they also don't
-need *all* the shares if they want to open the vault.
+allow 4 shares to restore the original code. Now they are sure that the
+majority of the staff will know when the vault is opened, but they can still
+open the vault when one of the staff members is abroad or sick at home.
 
 ## Installation
 
@@ -44,8 +44,8 @@ func main() {
         data[i] = 42
     }
 
-    // Create 5 shares; allow 3 to restore the original data
-    shares, err := sss.CreateShares(data, 5, 3)
+    // Create 5 shares; allow 4 to restore the original data
+    shares, err := sss.CreateShares(data, 5, 4)
     if err != nil {
         log.Fatalln(err)
     }
@@ -55,6 +55,7 @@ func main() {
     new_shares[0] = shares[2]
     new_shares[1] = shares[4]
     new_shares[2] = shares[0]
+    new_shares[3] = shares[3]
 
     // Try to restore the original secret
     restored, err := sss.CombineShares(new_shares)

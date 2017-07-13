@@ -19,7 +19,7 @@ func makeData(c byte) []byte {
 
 func TestCreateShares(t *testing.T) {
     data := makeData(42)
-    shares, err := CreateShares(data, 5, 3)
+    shares, err := CreateShares(data, 5, 4)
     if err != nil {
         t.Fail()
     }
@@ -80,14 +80,14 @@ func TestCombineShares(t *testing.T) {
 func BenchmarkCreateShares(b *testing.B) {
     data := makeData(42)
     for i := 0; i < b.N; i++ {
-        CreateShares(data, 5, 3)
+        CreateShares(data, 5, 4)
     }
 }
 
 
 func BenchmarkCombineShares(b *testing.B) {
     data := makeData(42)
-    shares, err := CreateShares(data, 5, 3)
+    shares, err := CreateShares(data, 5, 4)
     if err != nil {
         b.Error()
     }
