@@ -77,6 +77,24 @@ func TestCombineShares(t *testing.T) {
 }
 
 
+func TestDuplicateShares(t *testing.T) {
+    data := makeData(42)
+    shares, err := CreateShares(data, 3, 2)
+
+    // Remove one and maybe add duplicates
+    new_shares := make([][]byte, 0, 3);
+    new_shares = append(new_shares, shares[1])
+    new_shares = append(new_shares, shares[0])
+    new_shares = append(new_shares, shares[1])
+
+    // Combine the new set of shares
+    restored, err := CombineShares(new_shares)
+    if err != nil || restored == nil {
+        t.Error(err)
+    }
+}
+
+
 func BenchmarkCreateShares(b *testing.B) {
     data := makeData(42)
     for i := 0; i < b.N; i++ {

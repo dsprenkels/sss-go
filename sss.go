@@ -73,7 +73,31 @@ func CreateShares(data []byte, n int, k int) ([][]byte, error) {
 // a slice containing the original data. If it was impossible to restore a
 // sensible secret from the provided shares, `data` will be `nil`. (In this
 // case, the function returns `(nil, nil)`).
-func CombineShares(go_shares [][]byte) ([]byte, error) {
+func CombineShares(go_shares_in [][]byte) ([]byte, error) {
+    // Check the lengths of the shares
+    for i, share := range go_shares_in {
+        if len(share) != C.sss_SHARE_LEN {
+            msg := fmt.Sprintf("share %d has an invalid length", i)
+            return nil, errors.New(msg)
+        }
+    }
+
+    // Remove duplicate shares
+    go_shares_set := make(map[[C.sss_SHARE_LEN]byte]struct{}, len(go_shares_in))
+    for _, share := range go_shares_in {
+        var key [C.sss_SHARE_LEN]byte;
+        copy(key[:], share)
+        var empty struct{}
+        go_shares_set[key] = empty
+    }
+    go_shares := make([][]byte, 0, len(go_shares_set))
+    for share, _ := range go_shares_set {
+        new_share := make([]byte, C.sss_SHARE_LEN)
+        copy(new_share[:], share[:])
+        go_shares = append(go_shares, new_share)
+    }
+
+    // Check `n` and `k` parameters
     k := len(go_shares)
     if err := checkCombineK(k); err != nil {
         return nil, err
@@ -82,13 +106,9 @@ func CombineShares(go_shares [][]byte) ([]byte, error) {
     // Create a temporary buffer to hold the shares
     shares := make([]byte, k * C.sss_SHARE_LEN)
 
+    // Memcpy the share into our shares buffer
     for i, share := range go_shares {
-        if len(share) != C.sss_SHARE_LEN {
-            msg := fmt.Sprintf("share %d has an invalid length", i)
-            return nil, errors.New(msg)
-        }
-        // Memcpy the share into our shares buffer
-        copy(shares[i*C.sss_SHARE_LEN : (i+1)*C.sss_SHARE_LEN], go_shares[i][:])
+        copy(shares[i*C.sss_SHARE_LEN : (i+1)*C.sss_SHARE_LEN], share[:])
     }
 
     // Create a new slice to store the restored data in
