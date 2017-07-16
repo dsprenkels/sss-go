@@ -10,7 +10,7 @@ import (
 
 func makeKey(c byte) []byte {
 	key := make([]byte, 32)
-	for i, _ := range key {
+	for i := range key {
 		key[i] = c
 	}
 	return key
@@ -48,13 +48,13 @@ func TestCombineKeyshares(t *testing.T) {
 		}
 
 		// Throw some of the keyshares away
-		new_keyshares := make([][]byte, k2)
+		newKeyshares := make([][]byte, k2)
 		for i, idx := range rand.Perm(n)[:k2] {
-			new_keyshares[i] = keyshares[idx]
+			newKeyshares[i] = keyshares[idx]
 		}
 
 		// Combine the filtered keyshares
-		restored, err := CombineKeyshares(new_keyshares)
+		restored, err := CombineKeyshares(newKeyshares)
 		if err != nil {
 			if k2 == 0 {
 				return true

@@ -9,7 +9,7 @@ import (
 
 func makeData(c byte) []byte {
 	data := make([]byte, 64)
-	for i, _ := range data {
+	for i := range data {
 		data[i] = c
 	}
 	return data
@@ -47,13 +47,13 @@ func TestCombineShares(t *testing.T) {
 		}
 
 		// Throw some of the shares away
-		new_shares := make([][]byte, k2)
+		newShares := make([][]byte, k2)
 		for i, idx := range rand.Perm(n)[:k2] {
-			new_shares[i] = shares[idx]
+			newShares[i] = shares[idx]
 		}
 
 		// Combine the filtered shares
-		restored, err := CombineShares(new_shares)
+		restored, err := CombineShares(newShares)
 		if err != nil {
 			if k2 == 0 {
 				return true
@@ -63,9 +63,8 @@ func TestCombineShares(t *testing.T) {
 
 		if k2 < k {
 			return restored == nil
-		} else {
-			return bytes.Equal(data, restored)
 		}
+		return bytes.Equal(data, restored)
 	}
 
 	if err := quick.Check(f, &quick.Config{MaxCountScale: 10}); err != nil {
@@ -78,13 +77,13 @@ func TestDuplicateShares(t *testing.T) {
 	shares, err := CreateShares(data, 3, 2)
 
 	// Remove one and maybe add duplicates
-	new_shares := make([][]byte, 0, 3)
-	new_shares = append(new_shares, shares[1])
-	new_shares = append(new_shares, shares[0])
-	new_shares = append(new_shares, shares[1])
+	newShares := make([][]byte, 0, 3)
+	newShares = append(newShares, shares[1])
+	newShares = append(newShares, shares[0])
+	newShares = append(newShares, shares[1])
 
 	// Combine the new set of shares
-	restored, err := CombineShares(new_shares)
+	restored, err := CombineShares(newShares)
 	if err != nil || restored == nil {
 		t.Error(err)
 	}
