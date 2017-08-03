@@ -1,3 +1,20 @@
+// Package sss implements Shamir secret sharing over GF(256). The API exposes
+// two kinds of functions: functions for "shares" and functions for "keyshares".
+//
+// Both will split and recombine secret strings of data with a certain
+// threshold, but when using normal shares, the secret is first encapsulated in
+// an AEAD crypto_secretbox (Salsa20/Poly1305 from tweetnacl). This provides
+// cryptographic integrity and prevents tampering with the shares. So for
+// splitting a regular secret string, you should just use CreateShares and
+// CombineShares.
+//
+// However, CreateShares takes 64 bytes and produces shares that are 113 bytes
+// long. If this is not suitable for you, you can choose to use CreateKeyshares.
+// This function takes 32 bytes, and produces shares of just 33 bytes long. The
+// catch is that you can *only* use this for sharing cryptographic keys. In
+// other words: Any data that is shared by CreateKeyshares has to be uniformly
+// random, otherwise it may be possible for share-holders to tamper with their
+// shares in order to craft a different secret.
 package sss
 
 // #include "sss.h"
@@ -34,46 +51,46 @@ import (
 // `err` is not `nil`, as this indicates an error. If (and only if) `err` is
 // `nil`, `shares` will be a slice of share bufs which are each exactly 113
 // bytes long.
-func CreateShares(data []byte, n int, k int) ([][]byte, error) {
+func CreateShares(data []byte, count int, threshold int) ([][]byte, error) {
 	if len(data) != C.sss_MLEN {
 		msg := fmt.Sprintf("`data` must be %d bytes long", C.sss_MLEN)
 		return nil, errors.New(msg)
 	}
-	if err := checkNK(n, k); err != nil {
+	if err := checkNK(count, threshold); err != nil {
 		return nil, err
 	}
 
 	// Convert n and k to bytes
-	var ctyN, ctyK C.uint8_t = C.uint8_t(n), C.uint8_t(k)
+	var ctyN, ctyK C.uint8_t = C.uint8_t(count), C.uint8_t(threshold)
 
 	// Create a temporary buffer to hold the shares
-	shares := make([]byte, n*C.sizeof_sss_Share)
+	cShares := make([]byte, count*C.sizeof_sss_Share)
 
 	// Create the shares
 	C.sss_create_shares(
-		(*C.sss_Share)(unsafe.Pointer(&shares[0])),
+		(*C.sss_Share)(unsafe.Pointer(&cShares[0])),
 		(*C.uint8_t)(unsafe.Pointer(&data[0])),
 		ctyN, ctyK)
 
 	// Move the shares into a Go-friendly slice of slices
-	goShares := make([][]byte, n)
-	for i := 0; i < n; i++ {
-		goShares[i] = shares[i*C.sizeof_sss_Share : (i+1)*C.sizeof_sss_Share]
+	shares := make([][]byte, count)
+	for i := 0; i < count; i++ {
+		shares[i] = cShares[i*C.sizeof_sss_Share : (i+1)*C.sizeof_sss_Share]
 	}
 
-	return goShares, nil
+	return shares, nil
 }
 
 // CombineShares to combine the shares in `serialized_shares`. Each of the
 // shares passed to `CombineShares`, must be exactly 113 bytes long.
-// This funtion eturns a tuple `(data, err)`. The caller must check if `err`
+// This funtion returns a tuple `(data, err)`. The caller must check if `err`
 // is not `nil`, as this indicates an error. If `err` is `nil`, `data` may be
 // a slice containing the original data. If it was impossible to restore a
 // sensible secret from the provided shares, `data` will be `nil`. (In this
 // case, the function returns `(nil, nil)`).
-func CombineShares(goSharesIn [][]byte) ([]byte, error) {
+func CombineShares(shares [][]byte) ([]byte, error) {
 	// Check the lengths of the shares
-	for i, share := range goSharesIn {
+	for i, share := range shares {
 		if len(share) != C.sss_SHARE_LEN {
 			msg := fmt.Sprintf("share %d has an invalid length", i)
 			return nil, errors.New(msg)
@@ -81,32 +98,32 @@ func CombineShares(goSharesIn [][]byte) ([]byte, error) {
 	}
 
 	// Remove duplicate shares
-	goSharesSet := make(map[[C.sss_SHARE_LEN]byte]struct{}, len(goSharesIn))
-	for _, share := range goSharesIn {
+	sharesSet := make(map[[C.sss_SHARE_LEN]byte]struct{}, len(shares))
+	for _, share := range shares {
 		var key [C.sss_SHARE_LEN]byte
 		copy(key[:], share)
 		var empty struct{}
-		goSharesSet[key] = empty
+		sharesSet[key] = empty
 	}
-	goShares := make([][]byte, 0, len(goSharesSet))
-	for share := range goSharesSet {
+	newShares := make([][]byte, 0, len(sharesSet))
+	for share := range sharesSet {
 		newShare := make([]byte, C.sss_SHARE_LEN)
 		copy(newShare[:], share[:])
-		goShares = append(goShares, newShare)
+		newShares = append(newShares, newShare)
 	}
 
 	// Check `n` and `k` parameters
-	k := len(goShares)
+	k := len(newShares)
 	if err := checkCombineK(k); err != nil {
 		return nil, err
 	}
 
 	// Create a temporary buffer to hold the shares
-	shares := make([]byte, k*C.sss_SHARE_LEN)
+	cShares := make([]byte, k*C.sss_SHARE_LEN)
 
 	// Memcpy the share into our shares buffer
-	for i, share := range goShares {
-		copy(shares[i*C.sss_SHARE_LEN:(i+1)*C.sss_SHARE_LEN], share[:])
+	for i, share := range newShares {
+		copy(cShares[i*C.sss_SHARE_LEN:(i+1)*C.sss_SHARE_LEN], share[:])
 	}
 
 	// Create a new slice to store the restored data in
@@ -118,7 +135,7 @@ func CombineShares(goSharesIn [][]byte) ([]byte, error) {
 	// Combine the shares to restore the secret
 	ret, err := C.sss_combine_shares_go_wrapper(
 		(*C.uint8_t)(unsafe.Pointer(&data[0])),
-		(*C.sss_Share)(unsafe.Pointer(&shares[0])),
+		(*C.sss_Share)(unsafe.Pointer(&cShares[0])),
 		ctyK)
 	if err != nil {
 		return nil, err
