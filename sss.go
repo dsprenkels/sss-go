@@ -97,23 +97,8 @@ func CombineShares(shares [][]byte) ([]byte, error) {
 		}
 	}
 
-	// Remove duplicate shares
-	sharesSet := make(map[[C.sss_SHARE_LEN]byte]struct{}, len(shares))
-	for _, share := range shares {
-		var key [C.sss_SHARE_LEN]byte
-		copy(key[:], share)
-		var empty struct{}
-		sharesSet[key] = empty
-	}
-	newShares := make([][]byte, 0, len(sharesSet))
-	for share := range sharesSet {
-		newShare := make([]byte, C.sss_SHARE_LEN)
-		copy(newShare[:], share[:])
-		newShares = append(newShares, newShare)
-	}
-
 	// Check `n` and `k` parameters
-	k := len(newShares)
+	k := len(shares)
 	if err := checkCombineK(k); err != nil {
 		return nil, err
 	}
@@ -122,7 +107,7 @@ func CombineShares(shares [][]byte) ([]byte, error) {
 	cShares := make([]byte, k*C.sss_SHARE_LEN)
 
 	// Memcpy the share into our shares buffer
-	for i, share := range newShares {
+	for i, share := range shares {
 		copy(cShares[i*C.sss_SHARE_LEN:(i+1)*C.sss_SHARE_LEN], share[:])
 	}
 
