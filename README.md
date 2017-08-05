@@ -67,6 +67,14 @@ func main() {
 }
 ```
 
+## Changelog
+
+### Version 0.1.1
+
+- Remove an unintended side channel which allows a participating attacker with
+  access to a accurate timing channel to iteratively guess shares during the
+  execution of `combine_shares`.
+
 ## Questions
 
 Feel free to send me an email on my Github associated e-mail address.
