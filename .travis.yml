@@ -5,3 +5,7 @@ go:
   - 1.7
   - 1.8
   - master
+
+script:
+  - go test ${gobuild_args} ./...
+  - ./check_sss_files.sh
