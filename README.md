@@ -51,7 +51,7 @@ func main() {
     }
 
     // Permute and lose some of the shares (for demonstrational purposes)
-    new_shares := make([][]byte, 3)
+    new_shares := make([][]byte, 4)
     new_shares[0] = shares[2]
     new_shares[1] = shares[4]
     new_shares[2] = shares[0]
